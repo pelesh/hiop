@@ -99,6 +99,7 @@ if(HIOP_USE_GPU)
     set(CMAKE_CUDA_STANDARD 11)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
   endif()
+  find_package(CUDA REQUIRED)
 
   if(HIOP_NVCC_ARCH)
       set(CMAKE_CUDA_FLAGS "-arch=${HIOP_NVCC_ARCH}")
@@ -110,10 +111,30 @@ if(HIOP_USE_GPU)
   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 
   # for now we rely on MAGMA for GPUs computations
-  target_link_libraries(hiop_magma INTERFACE "-lmagma")
+  set(HIOP_MAGMA_DIR /usr CACHE PATH "Magma directory")
+  find_library(HIOP_MAGMA_LIB
+    NAMES magma
+    PATHS
+      ${HIOP_MAGMA_DIR}/lib
+      ${LIB_INSTALL_DIR})
+
+  if(HIOP_MAGMA_LIB)
+    message(STATUS "Using Magma lib '${HIOP_MAGMA_LIB}'")
+    target_link_libraries(hiop_math INTERFACE ${HIOP_MAGMA_LIB})
+  else()
+    message(FATAL_ERROR "Could not find MAGMA needed by HiOp's kron reduction. Please cmake with '-DHIOP_MAGMA_DIR=/path/to/magma_dir'; currently, HIOP_MAGMA_DIR='${HIOP_MAGMA_DIR}'")
+  endif(HIOP_MAGMA_LIB)
+
+  find_path(HIOP_MAGMA_INCLUDE_DIR
+    NAMES
+      magma.h
+    PATHS
+      ${HIOP_MAGMA_DIR}/include)
+
+  # target_link_libraries(hiop_magma INTERFACE "-lmagma")
   if(HIOP_MAGMA_DIR)
-    target_link_libraries(hiop_magma INTERFACE "-L${HIOP_MAGMA_DIR}/lib")
-    target_include_directories(hiop_magma INTERFACE "${HIOP_MAGMA_DIR}/include")
+    target_link_libraries(hiop_magma INTERFACE ${HIOP_MAGMA_LIB}) #"-L${HIOP_MAGMA_DIR}/lib")
+    target_include_directories(hiop_magma INTERFACE ${HIOP_MAGMA_INCLUDE_DIR})
   endif(HIOP_MAGMA_DIR)
 
   if(HIOP_CUDA_LIB_DIR)
@@ -129,9 +150,9 @@ if(HIOP_USE_GPU)
   endif(HIOP_CUBLAS_LIB_DIR)
 
   if(HIOP_CUDA_INCLUDE_DIR)
-    target_include_directories(hiop_cuda INTERFACE "${HIOP_CUDA_INCLUDE_DIR}")
+    target_include_directories(hiop_cuda INTERFACE ${HIOP_CUDA_INCLUDE_DIR})
   else()
-    target_include_directories(hiop_cuda INTERFACE "${CUDA_INCLUDE_DIR}")
+    target_include_directories(hiop_cuda INTERFACE ${CUDA_INCLUDE_DIR})
   endif(HIOP_CUDA_INCLUDE_DIR)
 
   target_link_libraries(hiop_math INTERFACE hiop_magma hiop_cuda)
